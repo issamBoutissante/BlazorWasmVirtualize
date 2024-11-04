@@ -29,11 +29,14 @@
 
         using var call = client.GetParts(request);
         var count = 0;
-
-        while (await call.ResponseStream.MoveNext(CancellationToken.None))
+        try
         {
-            var part = call.ResponseStream.Current;
-            parts.Add(new PartDto
+
+
+            while (await call.ResponseStream.MoveNext(CancellationToken.None))
+            {
+                var part = call.ResponseStream.Current;
+                parts.Add(new PartDto
                 {
                     Id = Guid.Parse(part.Id),
                     Name = part.Name,
@@ -41,9 +44,12 @@
                     Status = (PartStatus)part.Status
                 });
 
-            count++;
-            ProgressPercentage = (count * 100) / 1000; // Adjust based on your target item count
-            StateHasChanged(); // Update the UI with each chunk loaded
+                count++;
+                ProgressPercentage = (count * 100) / 1000; // Adjust based on your target item count
+            }
+        }catch(Exception ex)
+        {
+            
         }
     }
 

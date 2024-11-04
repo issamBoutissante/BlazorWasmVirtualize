@@ -14,31 +14,39 @@ public class PartService : VirtualizedGrid.Protos.PartService.PartServiceBase
     }
     public override async Task GetParts(PartsRequest request, IServerStreamWriter<Part> responseStream, ServerCallContext context)
     {
-        int skip = 0;
-        int chunkSize = request.ChunkSize > 0 ? request.ChunkSize : 100;
-
-        while (true)
+        try
         {
-            var parts = await _context.Parts
-                .Skip(skip)
-                .Take(chunkSize)
-                .Select(p => new Part
-                {
-                    Id = p.Id.ToString(),
-                    Name = p.Name,
-                    CreationDate = p.CreationDate.ToString("o"),
-                    Status = (PartStatus)p.Status
-                })
-                .ToListAsync();
+            int skip = 0;
+            int chunkSize = request.ChunkSize > 0 ? request.ChunkSize : 100;
 
-            if (parts.Count == 0) break;
-
-            foreach (var part in parts)
+            while (true)
             {
-                await responseStream.WriteAsync(part);
-            }
+                var parts = await _context.Parts
+                    .Skip(skip)
+                    .Take(chunkSize)
+                    .Select(p => new Part
+                    {
+                        Id = p.Id.ToString(),
+                        Name = p.Name,
+                        CreationDate = p.CreationDate.ToString("o"),
+                        Status = (PartStatus)p.Status
+                    })
+                    .ToListAsync();
 
-            skip += chunkSize;
+                if (parts.Count == 0) break;
+
+                foreach (var part in parts)
+                {
+                    await responseStream.WriteAsync(part);
+                }
+
+                skip += chunkSize;
+                if (skip == 1000)
+                    break;
+            }
+        }catch (Exception ex)
+        {
+
         }
     }
 }
