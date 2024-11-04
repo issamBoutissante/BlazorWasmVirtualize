@@ -74,7 +74,7 @@
     protected override async Task OnInitializedAsync()
     {
         var client = new PartService.PartServiceClient(Channel);
-        var request = new PartsRequest { ChunkSize = 1000 }; // Increased chunk size
+        var request = new PartsRequest { ChunkSize = 10_000 }; // Increased chunk size
 
         var stopwatch = System.Diagnostics.Stopwatch.StartNew();
         int updateInterval = 10; // Update progress UI every 10 chunks
@@ -100,12 +100,7 @@
 
                 ProgressPercentage = (ItemsFetched * 100) / 1_000_000; // Adjust based on your target item count
                 DataSize = CalculateDataSize(parts);
-
-                // Only update UI every 10 chunks to reduce rendering overhead
-                if (ItemsFetched % (request.ChunkSize * updateInterval) == 0)
-                {
-                    StateHasChanged();
-                }
+                StateHasChanged();
             }
         }
         catch (Exception ex)
