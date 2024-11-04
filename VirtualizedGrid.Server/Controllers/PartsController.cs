@@ -18,16 +18,7 @@ public class PartsController : ControllerBase
     [HttpGet]
     public async Task<ActionResult<IEnumerable<PartDto>>> GetAllParts()
     {
-        var parts = await _context.Parts
-            .Select(p => new PartDto
-            {
-                Id = p.Id,
-                Name = p.Name,
-                CreationDate = p.CreationDate,
-                Status = p.Status
-            })
-            .Take(100_000) // Limit to the first 100 items
-            .ToListAsync();
+        var parts=await _context.GetAllPartsAsync();
 
         return Ok(parts);
     }
