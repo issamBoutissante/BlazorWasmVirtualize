@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using VirtualizedGrid.Server;
+using VirtualizedGrid.Server.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -23,6 +24,9 @@ builder.Services.AddCors(options =>
                         .AllowAnyHeader());
 });
 
+// Add gRPC services to the container
+builder.Services.AddGrpc();
+
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.
@@ -36,6 +40,11 @@ app.UseHttpsRedirection();
 
 // Enable CORS with the defined policy
 app.UseCors("AllowAll");
+
+app.UseGrpcWeb(); // Enable gRPC-Web support
+
+// Map gRPC services and enable gRPC-Web
+app.MapGrpcService<PartService>().EnableGrpcWeb();
 
 app.UseAuthorization();
 

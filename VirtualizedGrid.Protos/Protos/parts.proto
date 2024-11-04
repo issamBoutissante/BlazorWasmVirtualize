@@ -1,0 +1,27 @@
+﻿syntax = "proto3";
+
+option csharp_namespace = "VirtualizedGrid.Protos";
+
+package parts;
+
+enum PartStatus {
+    AVAILABLE = 0;
+    OUT_OF_STOCK = 1;
+    DISCONTINUED = 2;
+    BACK_ORDER = 3;
+}
+
+message Part {
+    string id = 1;
+    string name = 2;
+    string creation_date = 3;
+    PartStatus status = 4;
+}
+
+service PartService {
+    rpc GetParts (PartsRequest) returns (stream Part);
+}
+
+message PartsRequest {
+    int32 chunk_size = 1;
+}
