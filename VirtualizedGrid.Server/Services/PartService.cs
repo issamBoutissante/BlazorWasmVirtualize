@@ -18,39 +18,27 @@ public class PartService : VirtualizedGrid.Protos.PartService.PartServiceBase
     {
         try
         {
-            int chunkSize = request.ChunkSize > 0 ? request.ChunkSize : 1000; // Increased chunk size for fewer calls
+            int chunkSize = request.ChunkSize > 0 ? request.ChunkSize : 1000;
             Guid? lastFetchedId = null;
 
             while (true)
             {
-                var query = _context.Parts
-                    .AsNoTracking()
-                    .OrderBy(p => p.Id)
-                    .Take(chunkSize);
-
-                if (lastFetchedId.HasValue)
-                {
-                    query = query.Where(p => p.Id > lastFetchedId);
-                }
-
-                var parts = await query
-                    .Select(p => new Part
-                    {
-                        Id = p.Id.ToString(),
-                        Name = p.Name,
-                        CreationDate = p.CreationDate.ToString("o"),
-                        Status = (PartStatus)p.Status
-                    })
-                    .ToListAsync();
+                var parts = await _context.GetPartsInChunksAsync(lastFetchedId, chunkSize);
 
                 if (parts.Count == 0) break;
 
                 foreach (var part in parts)
                 {
-                    await responseStream.WriteAsync(part);
+                    await responseStream.WriteAsync(new Part
+                    {
+                        Id = part.Id.ToString(),
+                        Name = part.Name,
+                        CreationDate = part.CreationDate.ToString("o"),
+                        Status = (PartStatus)part.Status
+                    });
                 }
 
-                //if (parts.Last().Id == "targetIdFor100000Items") break; // Adjust for target count as needed
+                lastFetchedId = parts.Last().Id;
             }
         }
         catch (Exception ex)
@@ -58,4 +46,5 @@ public class PartService : VirtualizedGrid.Protos.PartService.PartServiceBase
             // Handle exception logging if necessary
         }
     }
+
 }
