@@ -14,7 +14,7 @@ public class PartService : VirtualizedGrid.Protos.PartService.PartServiceBase
         _context = context;
     }
 
-    public override async Task GetParts(PartsRequest request, IServerStreamWriter<Part> responseStream, ServerCallContext context)
+    public override async Task GetParts(PartsRequest request, IServerStreamWriter<PartsBatch> responseStream, ServerCallContext context)
     {
         try
         {
@@ -23,21 +23,30 @@ public class PartService : VirtualizedGrid.Protos.PartService.PartServiceBase
 
             while (true)
             {
+                // Use the stored procedure to get parts in chunks
                 var parts = await _context.GetPartsInChunksAsync(lastFetchedId, chunkSize);
 
                 if (parts.Count == 0) break;
 
-                foreach (var part in parts)
+                // Create a PartsBatch and add the retrieved parts
+                var batch = new PartsBatch
                 {
-                    await responseStream.WriteAsync(new Part
+                    Parts =
                     {
-                        Id = part.Id.ToString(),
-                        Name = part.Name,
-                        CreationDate = part.CreationDate.ToString("o"),
-                        Status = (PartStatus)part.Status
-                    });
-                }
+                        parts.Select(p => new Part
+                        {
+                            Id = p.Id.ToString(),
+                            Name = p.Name,
+                            CreationDate = p.CreationDate.ToString("o"),
+                            Status = (PartStatus)p.Status
+                        })
+                    }
+                };
 
+                // Send the entire batch in one WriteAsync call
+                await responseStream.WriteAsync(batch);
+
+                // Update the last fetched ID for the next iteration
                 lastFetchedId = parts.Last().Id;
             }
         }
@@ -46,5 +55,4 @@ public class PartService : VirtualizedGrid.Protos.PartService.PartServiceBase
             // Handle exception logging if necessary
         }
     }
-
 }

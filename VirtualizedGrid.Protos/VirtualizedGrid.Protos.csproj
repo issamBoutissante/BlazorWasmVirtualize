@@ -15,7 +15,7 @@
     </PackageReference>
   </ItemGroup>
   <ItemGroup>
-    <Protobuf Include="Protos\parts.proto" GrpcServices="Both" />
+    <Protobuf Include="Protos\partsBatch.proto" GrpcServices="Both" />
   </ItemGroup>
 
 </Project>

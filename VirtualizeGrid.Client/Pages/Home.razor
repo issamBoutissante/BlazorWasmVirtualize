@@ -74,29 +74,38 @@
     protected override async Task OnInitializedAsync()
     {
         var client = new PartService.PartServiceClient(Channel);
-        var request = new PartsRequest { ChunkSize = 10_000 }; // Increased chunk size
+        var request = new PartsRequest { ChunkSize = 1000 }; // Increased chunk size
 
         var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+        int updateInterval = 10; // Update progress UI every 10 chunks
 
-        using var call = client.GetParts(request); // No need for WithCompression
+        using var call = client.GetParts(request);
         try
         {
             while (await call.ResponseStream.MoveNext(CancellationToken.None))
             {
-                var part = call.ResponseStream.Current;
-                parts.Add(new PartDto
-                    {
-                        Id = Guid.Parse(part.Id),
-                        Name = part.Name,
-                        CreationDate = DateTimeOffset.Parse(part.CreationDate),
-                        Status = (PartStatus)part.Status
-                    });
+                var batch = call.ResponseStream.Current;
 
-                ItemsFetched++;
+                foreach (var part in batch.Parts)
+                {
+                    parts.Add(new PartDto
+                        {
+                            Id = Guid.Parse(part.Id),
+                            Name = part.Name,
+                            CreationDate = DateTimeOffset.Parse(part.CreationDate),
+                            Status = (PartStatus)part.Status
+                        });
+                    ItemsFetched++;
+                }
+
                 ProgressPercentage = (ItemsFetched * 100) / 1_000_000; // Adjust based on your target item count
                 DataSize = CalculateDataSize(parts);
 
-                StateHasChanged();
+                // Only update UI every 10 chunks to reduce rendering overhead
+                if (ItemsFetched % (request.ChunkSize * updateInterval) == 0)
+                {
+                    StateHasChanged();
+                }
             }
         }
         catch (Exception ex)

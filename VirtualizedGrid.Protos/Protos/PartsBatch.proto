@@ -11,6 +11,7 @@ enum PartStatus {
     BACK_ORDER = 3;
 }
 
+// Define the Part message
 message Part {
     string id = 1;
     string name = 2;
@@ -18,8 +19,14 @@ message Part {
     PartStatus status = 4;
 }
 
+// Define a PartsBatch message to send multiple Part items in one response
+message PartsBatch {
+    repeated Part parts = 1;
+}
+
+// Modify the service to return a stream of PartsBatch
 service PartService {
-    rpc GetParts (PartsRequest) returns (stream Part);
+    rpc GetParts (PartsRequest) returns (stream PartsBatch);
 }
 
 message PartsRequest {
