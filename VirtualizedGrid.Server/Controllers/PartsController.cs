@@ -1,4 +1,5 @@
 ﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
 using VirtualizedGrid.Server.DTOs;
 using Models = VirtualizedGrid.Server.Models; // Alias for DbContext Part model
@@ -19,7 +20,7 @@ public class PartsController : ControllerBase
         _cache = cache;
     }
 
-    [HttpGet]
+    [HttpGet(nameof(GetAllParts))]
     public async Task<ActionResult<IEnumerable<PartDto>>> GetAllParts([FromQuery] int offset = 0, [FromQuery] int limit = 1000)
     {
         // Validate limit to avoid excessive data loads
@@ -45,5 +46,10 @@ public class PartsController : ControllerBase
         }).ToList();
 
         return Ok(chunk);
+    }
+    [HttpGet(nameof(GetPartsCount))]
+    public async Task<ActionResult<IEnumerable<PartDto>>> GetPartsCount([FromQuery] int offset = 0, [FromQuery] int limit = 1000)
+    {
+        return Ok(await _context.Parts.CountAsync());
     }
 }

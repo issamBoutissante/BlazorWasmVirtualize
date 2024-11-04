@@ -97,7 +97,7 @@
                     ItemsFetched++;
                 }
 
-                ProgressPercentage = (ItemsFetched * 100) / 1_000_000; // Adjust based on your target item count
+                ProgressPercentage = (ItemsFetched * 100) / 100_000; // Adjust based on your target item count
                 DataSize = CalculateDataSize(parts);
                 StateHasChanged();
             }
