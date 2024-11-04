@@ -26,8 +26,10 @@ public class PartsController : ControllerBase
                 CreationDate = p.CreationDate,
                 Status = p.Status
             })
+            .Take(100_000) // Limit to the first 100 items
             .ToListAsync();
 
         return Ok(parts);
     }
+
 }
