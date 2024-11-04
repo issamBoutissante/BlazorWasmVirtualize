@@ -41,7 +41,7 @@ public class PartService : VirtualizedGrid.Protos.PartService.PartServiceBase
                 }
 
                 skip += chunkSize;
-                if (skip == 1000)
+                if (skip == 100_000)
                     break;
             }
         }catch (Exception ex)

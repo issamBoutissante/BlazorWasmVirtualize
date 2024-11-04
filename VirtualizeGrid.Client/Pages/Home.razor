@@ -4,6 +4,47 @@
 @inject GrpcChannel Channel
 
 <h3>Parts List</h3>
+<style>
+    .content-container {
+        padding-bottom: 80px; /* Space for the footer */
+    }
+
+    .fixed-footer {
+        position: fixed;
+        bottom: 0;
+        width: 100%;
+        background-color: #f8f8f8;
+        padding: 10px;
+        text-align: center;
+        font-weight: bold;
+        border-top: 1px solid #ccc;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+    }
+
+    .progress-bar {
+        width: 100%;
+        background-color: #e0e0e0;
+        height: 20px;
+        border-radius: 5px;
+        margin-top: 5px;
+    }
+
+    .progress {
+        background-color: #4caf50;
+        height: 100%;
+        border-radius: 5px;
+        text-align: center;
+        color: white;
+    }
+
+    .footer-details p {
+        margin: 5px 0;
+        font-size: 14px;
+    }
+
+</style>
 
 <!-- Display parts data -->
 <Virtualize Items="@parts" Context="part" ItemSize="50">
@@ -13,44 +54,66 @@
     </div>
 </Virtualize>
 
-<!-- Progress bar -->
-<div class="progress-bar">
-    <div class="progress" style="width: @ProgressPercentage%;">@ProgressPercentage% loaded</div>
+<!-- Fixed Footer for Progress Details -->
+<div class="fixed-footer">
+    <div class="progress-bar">
+        <div class="progress" style="width: @ProgressPercentage%;">@ProgressPercentage% loaded</div>
+    </div>
+    <div class="footer-details">
+        <p>Progress: @ProgressPercentage% | Items Fetched: @ItemsFetched | Data Size: @DataSize MB | Time: @TimeSpentFetching seconds</p>
+    </div>
 </div>
 
 @code {
     private List<PartDto> parts = new();
     private int ProgressPercentage = 0;
+    private int ItemsFetched = 0;
+    private double DataSize = 0;
+    private double TimeSpentFetching = 0;
 
     protected override async Task OnInitializedAsync()
     {
         var client = new PartService.PartServiceClient(Channel);
         var request = new PartsRequest { ChunkSize = 100 };
 
+        var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+
         using var call = client.GetParts(request);
-        var count = 0;
         try
         {
-
-
             while (await call.ResponseStream.MoveNext(CancellationToken.None))
             {
                 var part = call.ResponseStream.Current;
                 parts.Add(new PartDto
-                {
-                    Id = Guid.Parse(part.Id),
-                    Name = part.Name,
-                    CreationDate = DateTimeOffset.Parse(part.CreationDate),
-                    Status = (PartStatus)part.Status
-                });
+                    {
+                        Id = Guid.Parse(part.Id),
+                        Name = part.Name,
+                        CreationDate = DateTimeOffset.Parse(part.CreationDate),
+                        Status = (PartStatus)part.Status
+                    });
 
-                count++;
-                ProgressPercentage = (count * 100) / 1000; // Adjust based on your target item count
+                ItemsFetched++;
+                ProgressPercentage = (ItemsFetched * 100) / 100_000; // Adjust based on your target item count
+                DataSize = CalculateDataSize(parts);
+                StateHasChanged(); // Update the UI with each chunk loaded
             }
-        }catch(Exception ex)
-        {
-            
         }
+        catch (Exception ex)
+        {
+            // Handle any exceptions
+        }
+        finally
+        {
+            stopwatch.Stop();
+            TimeSpentFetching = stopwatch.Elapsed.TotalSeconds;
+        }
+    }
+
+    private double CalculateDataSize(List<PartDto> data)
+    {
+        // Estimate size per item (16 + 36 + 8 + 4 bytes for each property)
+        int sizePerItem = 16 + (36 + 8 + 4);
+        return (data.Count * sizePerItem) / (1024.0 * 1024.0);
     }
 
     public class PartDto
