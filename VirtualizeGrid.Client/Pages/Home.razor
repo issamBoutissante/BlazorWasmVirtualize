@@ -74,11 +74,12 @@
     protected override async Task OnInitializedAsync()
     {
         var client = new PartService.PartServiceClient(Channel);
-        var request = new PartsRequest { ChunkSize = 100 };
+        var request = new PartsRequest { ChunkSize = 10_000 }; // Increased chunk size
 
         var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+        int updateInterval = 10; // Update progress UI every 10 chunks
 
-        using var call = client.GetParts(request);
+        using var call = client.GetParts(request); // No need for WithCompression
         try
         {
             while (await call.ResponseStream.MoveNext(CancellationToken.None))
@@ -93,9 +94,14 @@
                     });
 
                 ItemsFetched++;
-                ProgressPercentage = (ItemsFetched * 100) / 100_000; // Adjust based on your target item count
+                ProgressPercentage = (ItemsFetched * 100) / 1_000_000; // Adjust based on your target item count
                 DataSize = CalculateDataSize(parts);
-                StateHasChanged(); // Update the UI with each chunk loaded
+
+                // Only update UI every 10 chunks to reduce rendering overhead
+                if (ItemsFetched % (request.ChunkSize * updateInterval) == 0)
+                {
+                    StateHasChanged();
+                }
             }
         }
         catch (Exception ex)
@@ -106,6 +112,7 @@
         {
             stopwatch.Stop();
             TimeSpentFetching = stopwatch.Elapsed.TotalSeconds;
+            StateHasChanged(); // Final UI update after fetching completes
         }
     }
 

@@ -25,7 +25,12 @@ builder.Services.AddCors(options =>
 });
 
 // Add gRPC services to the container
-builder.Services.AddGrpc();
+builder.Services.AddGrpc(options =>
+{
+    options.EnableDetailedErrors = true;
+    options.ResponseCompressionLevel = System.IO.Compression.CompressionLevel.Fastest;
+});
+
 
 var app = builder.Build();
 

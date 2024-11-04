@@ -1,6 +1,7 @@
-﻿using VirtualizedGrid.Protos;
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
+using VirtualizedGrid.Server;
 using Grpc.Core;
+using VirtualizedGrid.Protos;
 
 namespace VirtualizedGrid.Server.Services;
 
@@ -12,18 +13,27 @@ public class PartService : VirtualizedGrid.Protos.PartService.PartServiceBase
     {
         _context = context;
     }
+
     public override async Task GetParts(PartsRequest request, IServerStreamWriter<Part> responseStream, ServerCallContext context)
     {
         try
         {
-            int skip = 0;
-            int chunkSize = request.ChunkSize > 0 ? request.ChunkSize : 100;
+            int chunkSize = request.ChunkSize > 0 ? request.ChunkSize : 1000; // Increased chunk size for fewer calls
+            Guid? lastFetchedId = null;
 
             while (true)
             {
-                var parts = await _context.Parts
-                    .Skip(skip)
-                    .Take(chunkSize)
+                var query = _context.Parts
+                    .AsNoTracking()
+                    .OrderBy(p => p.Id)
+                    .Take(chunkSize);
+
+                if (lastFetchedId.HasValue)
+                {
+                    query = query.Where(p => p.Id > lastFetchedId);
+                }
+
+                var parts = await query
                     .Select(p => new Part
                     {
                         Id = p.Id.ToString(),
@@ -40,13 +50,12 @@ public class PartService : VirtualizedGrid.Protos.PartService.PartServiceBase
                     await responseStream.WriteAsync(part);
                 }
 
-                skip += chunkSize;
-                if (skip == 100_000)
-                    break;
+                //if (parts.Last().Id == "targetIdFor100000Items") break; // Adjust for target count as needed
             }
-        }catch (Exception ex)
+        }
+        catch (Exception ex)
         {
-
+            // Handle exception logging if necessary
         }
     }
 }
