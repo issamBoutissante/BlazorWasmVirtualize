@@ -74,10 +74,9 @@
     protected override async Task OnInitializedAsync()
     {
         var client = new PartService.PartServiceClient(Channel);
-        var request = new PartsRequest { ChunkSize = 10_000 }; // Increased chunk size
+        var request = new PartsRequest { ChunkSize = 30_000 }; // Increased chunk size
 
         var stopwatch = System.Diagnostics.Stopwatch.StartNew();
-        int updateInterval = 10; // Update progress UI every 10 chunks
 
         using var call = client.GetParts(request);
         try

@@ -31,6 +31,7 @@ builder.Services.AddGrpc(options =>
     options.ResponseCompressionLevel = System.IO.Compression.CompressionLevel.Fastest;
 });
 
+builder.Services.AddMemoryCache();
 
 var app = builder.Build();
 
