@@ -1,58 +1,75 @@
-﻿using Microsoft.EntityFrameworkCore;
-using VirtualizedGrid.Server;
-using Grpc.Core;
+﻿using Grpc.Core;
+using Microsoft.Extensions.Caching.Memory;
+using static VirtualizedGrid.Protos.PartService;
 using VirtualizedGrid.Protos;
+using VirtualizedGrid.Server;
+using Models=VirtualizedGrid.Server.Models; // Namespace for the model Part
 
+// Alias to avoid conflict with the DbContext Part
+using ProtoPart = VirtualizedGrid.Protos.Part;
+using ProtoPartStatus = VirtualizedGrid.Protos.PartStatus;
+using System.Collections.Generic;
 namespace VirtualizedGrid.Server.Services;
 
-public class PartService : VirtualizedGrid.Protos.PartService.PartServiceBase
+public class PartService : PartServiceBase
 {
     private readonly AppDbContext _context;
+    private readonly IMemoryCache _cache;
+    private static readonly string CacheKey = "PartsDataCache";
 
-    public PartService(AppDbContext context)
+    public PartService(AppDbContext context, IMemoryCache cache)
     {
         _context = context;
+        _cache = cache;
     }
 
     public override async Task GetParts(PartsRequest request, IServerStreamWriter<PartsBatch> responseStream, ServerCallContext context)
     {
-        try
+        int chunkSize = request.ChunkSize > 0 ? request.ChunkSize : 1000;
+        Guid? lastFetchedId = null;
+
+        // Check if data is already cached
+        if (!_cache.TryGetValue(CacheKey, out List<Models.Part> cachedParts))
         {
-            int chunkSize = request.ChunkSize > 0 ? request.ChunkSize : 1000;
-            Guid? lastFetchedId = null;
+            cachedParts = new List<Models.Part>();
 
             while (true)
             {
-                // Use the stored procedure to get parts in chunks
+                // Fetch data from the database in chunks
                 var parts = await _context.GetPartsInChunksAsync(lastFetchedId, chunkSize);
-
                 if (parts.Count == 0) break;
 
-                // Create a PartsBatch and add the retrieved parts
-                var batch = new PartsBatch
-                {
-                    Parts =
-                    {
-                        parts.Select(p => new Part
-                        {
-                            Id = p.Id.ToString(),
-                            Name = p.Name,
-                            CreationDate = p.CreationDate.ToString("o"),
-                            Status = (PartStatus)p.Status
-                        })
-                    }
-                };
+                cachedParts.AddRange(parts);
 
-                // Send the entire batch in one WriteAsync call
-                await responseStream.WriteAsync(batch);
-
-                // Update the last fetched ID for the next iteration
+                // Update last fetched ID
                 lastFetchedId = parts.Last().Id;
             }
+
+            // Cache the parts data with an expiration time (e.g., 1 hour)
+            _cache.Set(CacheKey, cachedParts, TimeSpan.FromHours(1));
         }
-        catch (Exception ex)
+
+        // Send data in batches from cache
+        foreach (var batch in cachedParts.Chunk(chunkSize))
         {
-            // Handle exception logging if necessary
+            var partsBatch = new PartsBatch
+            {
+                Parts = { batch.Select(p => MapToProtoPart(p)) }
+            };
+
+            await responseStream.WriteAsync(partsBatch);
         }
+    }
+
+    // Helper method to map DbContext Part to Proto Part
+    private ProtoPart MapToProtoPart(Models.Part dbPart)
+    {
+        return new ProtoPart
+        {
+            Id = dbPart.Id.ToString(),
+            Name = dbPart.Name,
+            CreationDate = dbPart.CreationDate.ToString("o"),
+            Status = (ProtoPartStatus)dbPart.Status
+        };
     }
 }
