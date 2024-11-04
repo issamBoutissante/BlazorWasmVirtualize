@@ -1,0 +1,89 @@
+﻿@page "/"
+@inject HttpClient Http
+@using System.Collections.Generic
+@using System.Threading.Tasks
+@using System.Diagnostics
+
+<h3>Parts List</h3>
+
+<div class="content-container">
+    <Virtualize Items="@parts" Context="part" ItemSize="50">
+        <div style="padding: 5px; border-bottom: 1px solid #ccc;">
+            <strong>@part.Name</strong> - @part.Status <br />
+            Created on: @part.CreationDate.ToString("yyyy-MM-dd")
+        </div>
+    </Virtualize>
+</div>
+
+<!-- Fixed Footer with details and a progress bar -->
+<div class="fixed-footer">
+    Total Parts Displayed: @parts.Count <br />
+    Data Size: @DataSize MB <br />
+    Time Spent Fetching: @TimeSpentFetching seconds <br />
+    
+    <!-- Progress bar -->
+    <div style="background-color: #e0e0e0; height: 20px; width: 100%; border-radius: 5px; margin-top: 10px;">
+        <div style="background-color: #4caf50; height: 100%; border-radius: 5px; width: @ProgressPercentage%;"></div>
+    </div>
+    <span>@ProgressPercentage% loaded</span>
+</div>
+
+@code {
+    private List<PartDto> parts = new();
+    private double TimeSpentFetching { get; set; }
+    private double DataSize { get; set; }
+    private int ProgressPercentage { get; set; } = 0;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var stopwatch = Stopwatch.StartNew();
+        
+        // Simulated chunk loading with a delay for progress demonstration
+        const int totalChunks = 5;
+        const int delayPerChunk = 300; // Delay per chunk in ms for simulation
+        var partData = await LoadPartsDataAsync(); // Load all data once for simplicity
+        
+        for (int i = 1; i <= totalChunks; i++)
+        {
+            await Task.Delay(delayPerChunk); // Simulate loading chunk by chunk
+            parts.AddRange(partData.Take(partData.Count / totalChunks)); // Add a chunk of data
+            ProgressPercentage = (i * 100) / totalChunks; // Update progress percentage
+            StateHasChanged(); // Refresh UI
+        }
+
+        stopwatch.Stop();
+        TimeSpentFetching = stopwatch.Elapsed.TotalSeconds;
+
+        // Calculate data size in MB
+        DataSize = CalculateDataSize(parts);
+    }
+
+    private async Task<List<PartDto>> LoadPartsDataAsync()
+    {
+        // Fetch all parts data from the API
+        return await Http.GetFromJsonAsync<List<PartDto>>("https://localhost:7238/api/parts");
+    }
+
+    private double CalculateDataSize(List<PartDto> data)
+    {
+        // Estimate size per item (16 + 36 + 8 + 4 bytes)
+        int sizePerItem = 16 + (36 + 8 + 4); 
+        return (data.Count * sizePerItem) / (1024.0 * 1024.0);
+    }
+
+    public class PartDto
+    {
+        public Guid Id { get; set; }
+        public string Name { get; set; }
+        public DateTimeOffset CreationDate { get; set; }
+        public PartStatus Status { get; set; }
+    }
+
+    public enum PartStatus
+    {
+        Available,
+        OutOfStock,
+        Discontinued,
+        BackOrder
+    }
+}
