@@ -1,0 +1,24 @@
+﻿@page "/"
+<h3>Home Page</h3>
+
+<div style="display: flex; gap: 20px; margin-top: 20px;">
+    <button @onclick="NavigateToRestPage" class="btn btn-primary">Get Parts with REST</button>
+    <button @onclick="NavigateToGrpcPage" class="btn btn-primary">Get Parts with gRPC</button>
+</div>
+
+@code {
+    private void NavigateToRestPage()
+    {
+        // Navigate to the page that uses REST API
+        NavigationManager.NavigateTo("/parts-rest");
+    }
+
+    private void NavigateToGrpcPage()
+    {
+        // Navigate to the page that uses gRPC
+        NavigationManager.NavigateTo("/parts-grpc");
+    }
+
+    [Inject]
+    private NavigationManager NavigationManager { get; set; } = default!;
+}
