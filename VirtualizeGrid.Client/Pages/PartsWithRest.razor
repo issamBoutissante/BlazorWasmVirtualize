@@ -1,0 +1,131 @@
+﻿@page "/parts-rest"
+@inject HttpClient Http
+
+<h3>Parts List</h3>
+<style>
+    .content-container {
+        padding-bottom: 80px; /* Space for the footer */
+    }
+
+    .fixed-footer {
+        position: fixed;
+        bottom: 0;
+        width: 100%;
+        background-color: #f8f8f8;
+        padding: 10px;
+        text-align: center;
+        font-weight: bold;
+        border-top: 1px solid #ccc;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+    }
+
+    .progress-bar {
+        width: 100%;
+        background-color: #e0e0e0;
+        height: 20px;
+        border-radius: 5px;
+        margin-top: 5px;
+    }
+
+    .progress {
+        background-color: #4caf50;
+        height: 100%;
+        border-radius: 5px;
+        text-align: center;
+        color: white;
+    }
+
+    .footer-details p {
+        margin: 5px 0;
+        font-size: 14px;
+    }
+
+</style>
+
+<!-- Display parts data -->
+<Virtualize Items="@parts" Context="part" ItemSize="50">
+    <div style="padding: 5px; border-bottom: 1px solid #ccc;">
+        <strong>@part.Name</strong> - @part.Status <br />
+        Created on: @part.CreationDate.ToString("yyyy-MM-dd")
+    </div>
+</Virtualize>
+
+<!-- Fixed Footer for Progress Details -->
+<div class="fixed-footer">
+    <div class="progress-bar">
+        <div class="progress" style="width: @ProgressPercentage%;">@ProgressPercentage% loaded</div>
+    </div>
+    <div class="footer-details">
+        <p>Progress: @ProgressPercentage% | Items Fetched: @ItemsFetched | Data Size: @DataSize MB | Time: @TimeSpentFetching seconds</p>
+    </div>
+</div>
+
+@code {
+    private List<PartDto> parts = new();
+    private int ProgressPercentage = 0;
+    private int ItemsFetched = 0;
+    private double DataSize = 0;
+    private double TimeSpentFetching = 0;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+
+        // Fetch data in chunks of 20,000 parts
+        var totalParts = 1_000_000; // Adjust based on expected count
+        int chunkSize = 20_000;
+        int offset = 0;
+
+        try
+        {
+            while (offset < totalParts)
+            {
+                var response = await Http.GetFromJsonAsync<List<PartDto>>($"https://localhost:7238/api/Parts?offset={offset}&limit={chunkSize}");
+                if (response == null || response.Count == 0) break;
+
+                parts.AddRange(response);
+                ItemsFetched += response.Count;
+                ProgressPercentage = (ItemsFetched * 100) / totalParts;
+                DataSize = CalculateDataSize(parts);
+                StateHasChanged(); // Update UI
+
+                offset += chunkSize;
+            }
+        }
+        catch (Exception ex)
+        {
+            // Handle any exceptions
+        }
+        finally
+        {
+            stopwatch.Stop();
+            TimeSpentFetching = stopwatch.Elapsed.TotalSeconds;
+            StateHasChanged(); // Final UI update after fetching completes
+        }
+    }
+
+    private double CalculateDataSize(List<PartDto> data)
+    {
+        // Estimate size per item (16 + 36 + 8 + 4 bytes for each property)
+        int sizePerItem = 16 + (36 + 8 + 4);
+        return (data.Count * sizePerItem) / (1024.0 * 1024.0);
+    }
+
+    public class PartDto
+    {
+        public Guid Id { get; set; }
+        public string Name { get; set; }
+        public DateTimeOffset CreationDate { get; set; }
+        public PartStatus Status { get; set; }
+    }
+
+    public enum PartStatus
+    {
+        Available,
+        OutOfStock,
+        Discontinued,
+        BackOrder
+    }
+}

@@ -7,7 +7,7 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "VirtualizedGrid.Server", "V
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "VirtualizeGrid.Client", "VirtualizeGrid.Client\VirtualizeGrid.Client.csproj", "{A81506DA-6B7D-46BC-9D8A-DC56401EA37A}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "VirtualizedGrid.Protos", "VirtualizedGrid.Protos\VirtualizedGrid.Protos.csproj", "{B8380ADC-E77A-4302-98A8-79EE0E5F0F15}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "VirtualizedGrid.Protos", "VirtualizedGrid.Protos\VirtualizedGrid.Protos.csproj", "{B8380ADC-E77A-4302-98A8-79EE0E5F0F15}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
