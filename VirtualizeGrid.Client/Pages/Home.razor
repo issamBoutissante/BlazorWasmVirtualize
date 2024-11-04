@@ -74,7 +74,7 @@
     protected override async Task OnInitializedAsync()
     {
         var client = new PartService.PartServiceClient(Channel);
-        var request = new PartsRequest { ChunkSize = 30_000 }; // Increased chunk size
+        var request = new PartsRequest { ChunkSize = 20_000 }; // Increased chunk size
 
         var stopwatch = System.Diagnostics.Stopwatch.StartNew();
 

@@ -19,6 +19,12 @@ namespace VirtualizedGrid.Server
                 .AsNoTracking()
                 .ToListAsync();
         }
-
+        public async Task<List<Part>> GetAllPartsAsync()
+        {
+            return await Parts
+                .FromSqlRaw("EXEC GetAllParts")
+                .AsNoTracking()
+                .ToListAsync();
+        }
     }
 }

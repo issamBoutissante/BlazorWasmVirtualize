@@ -3,12 +3,13 @@ using Microsoft.Extensions.Caching.Memory;
 using static VirtualizedGrid.Protos.PartService;
 using VirtualizedGrid.Protos;
 using VirtualizedGrid.Server;
-using Models=VirtualizedGrid.Server.Models; // Namespace for the model Part
+using Models = VirtualizedGrid.Server.Models; // Alias for DbContext Part model
 
-// Alias to avoid conflict with the DbContext Part
+// Aliases to avoid conflicts with the generated proto classes
 using ProtoPart = VirtualizedGrid.Protos.Part;
 using ProtoPartStatus = VirtualizedGrid.Protos.PartStatus;
 using System.Collections.Generic;
+
 namespace VirtualizedGrid.Server.Services;
 
 public class PartService : PartServiceBase
@@ -26,30 +27,18 @@ public class PartService : PartServiceBase
     public override async Task GetParts(PartsRequest request, IServerStreamWriter<PartsBatch> responseStream, ServerCallContext context)
     {
         int chunkSize = request.ChunkSize > 0 ? request.ChunkSize : 1000;
-        Guid? lastFetchedId = null;
 
         // Check if data is already cached
         if (!_cache.TryGetValue(CacheKey, out List<Models.Part> cachedParts))
         {
-            cachedParts = new List<Models.Part>();
+            // Load all parts from the database once
+            cachedParts = await _context.GetAllPartsAsync();
 
-            while (true)
-            {
-                // Fetch data from the database in chunks
-                var parts = await _context.GetPartsInChunksAsync(lastFetchedId, chunkSize);
-                if (parts.Count == 0) break;
-
-                cachedParts.AddRange(parts);
-
-                // Update last fetched ID
-                lastFetchedId = parts.Last().Id;
-            }
-
-            // Cache the parts data with an expiration time (e.g., 1 hour)
+            // Cache the entire parts list with an expiration time (e.g., 1 hour)
             _cache.Set(CacheKey, cachedParts, TimeSpan.FromHours(1));
         }
 
-        // Send data in batches from cache
+        // Stream data in chunks from the cached parts
         foreach (var batch in cachedParts.Chunk(chunkSize))
         {
             var partsBatch = new PartsBatch
