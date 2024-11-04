@@ -46,7 +46,6 @@
 
 </style>
 
-<!-- Display parts data -->
 <Virtualize Items="@parts" Context="part" ItemSize="50">
     <div style="padding: 5px; border-bottom: 1px solid #ccc;">
         <strong>@part.Name</strong> - @part.Status <br />
@@ -54,7 +53,6 @@
     </div>
 </Virtualize>
 
-<!-- Fixed Footer for Progress Details -->
 <div class="fixed-footer">
     <div class="progress-bar">
         <div class="progress" style="width: @ProgressPercentage%;">@ProgressPercentage% loaded</div>
@@ -68,14 +66,19 @@
     private List<PartDto> parts = new();
     private int ProgressPercentage = 0;
     private int ItemsFetched = 0;
+    private int TotalItems = 100_000; // Default or placeholder value
     private double DataSize = 0;
     private double TimeSpentFetching = 0;
 
     protected override async Task OnInitializedAsync()
     {
         var client = new PartService.PartServiceClient(Channel);
-        var request = new PartsRequest { ChunkSize = 20_000 }; // Increased chunk size
 
+        // Fetch the total count
+        var totalCountResponse = await client.GetPartsCountAsync(new Google.Protobuf.WellKnownTypes.Empty());
+        TotalItems = totalCountResponse.TotalCount;
+
+        var request = new PartsRequest { ChunkSize = 20_000 };
         var stopwatch = System.Diagnostics.Stopwatch.StartNew();
 
         using var call = client.GetParts(request);
@@ -84,7 +87,6 @@
             while (await call.ResponseStream.MoveNext(CancellationToken.None))
             {
                 var batch = call.ResponseStream.Current;
-
                 foreach (var part in batch.Parts)
                 {
                     parts.Add(new PartDto
@@ -97,7 +99,7 @@
                     ItemsFetched++;
                 }
 
-                ProgressPercentage = (ItemsFetched * 100) / 100_000; // Adjust based on your target item count
+                ProgressPercentage = (ItemsFetched * 100) / TotalItems;
                 DataSize = CalculateDataSize(parts);
                 StateHasChanged();
             }
@@ -116,7 +118,6 @@
 
     private double CalculateDataSize(List<PartDto> data)
     {
-        // Estimate size per item (16 + 36 + 8 + 4 bytes for each property)
         int sizePerItem = 16 + (36 + 8 + 4);
         return (data.Count * sizePerItem) / (1024.0 * 1024.0);
     }

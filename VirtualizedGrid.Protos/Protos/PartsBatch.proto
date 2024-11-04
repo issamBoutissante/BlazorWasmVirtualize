@@ -1,17 +1,22 @@
 ﻿syntax = "proto3";
 
-option csharp_namespace = "VirtualizedGrid.Protos";
+import "google/protobuf/empty.proto"; // Import the Empty type
 
-package parts;
+package VirtualizedGrid.Protos;
 
-enum PartStatus {
-    AVAILABLE = 0;
-    OUT_OF_STOCK = 1;
-    DISCONTINUED = 2;
-    BACK_ORDER = 3;
+service PartService {
+    rpc GetParts (PartsRequest) returns (stream PartsBatch);
+    rpc GetPartsCount (google.protobuf.Empty) returns (PartsCountResponse);
 }
 
-// Define the Part message
+message PartsRequest {
+    int32 chunk_size = 1;
+}
+
+message PartsBatch {
+    repeated Part parts = 1;
+}
+
 message Part {
     string id = 1;
     string name = 2;
@@ -19,16 +24,13 @@ message Part {
     PartStatus status = 4;
 }
 
-// Define a PartsBatch message to send multiple Part items in one response
-message PartsBatch {
-    repeated Part parts = 1;
+message PartsCountResponse {
+    int32 total_count = 1;
 }
 
-// Modify the service to return a stream of PartsBatch
-service PartService {
-    rpc GetParts (PartsRequest) returns (stream PartsBatch);
-}
-
-message PartsRequest {
-    int32 chunk_size = 1;
+enum PartStatus {
+    AVAILABLE = 0;
+    OUT_OF_STOCK = 1;
+    DISCONTINUED = 2;
+    BACK_ORDER = 3;
 }

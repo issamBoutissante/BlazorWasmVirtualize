@@ -9,6 +9,8 @@ using Models = VirtualizedGrid.Server.Models; // Alias for DbContext Part model
 using ProtoPart = VirtualizedGrid.Protos.Part;
 using ProtoPartStatus = VirtualizedGrid.Protos.PartStatus;
 using System.Collections.Generic;
+using Google.Protobuf.WellKnownTypes;
+using Microsoft.EntityFrameworkCore;
 
 namespace VirtualizedGrid.Server.Services;
 
@@ -48,6 +50,11 @@ public class PartService : PartServiceBase
 
             await responseStream.WriteAsync(partsBatch);
         }
+    }
+    public override async Task<PartsCountResponse> GetPartsCount(Empty request, ServerCallContext context)
+    {
+        int totalCount = await _context.Parts.CountAsync();
+        return new PartsCountResponse { TotalCount = totalCount };
     }
 
     // Helper method to map DbContext Part to Proto Part
