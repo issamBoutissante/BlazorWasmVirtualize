@@ -25,5 +25,6 @@ builder.Services.AddSingleton(services =>
 
     return grpcChannel;
 });
+builder.Services.AddSingleton<LocalDatabaseService>();
 
 await builder.Build().RunAsync();

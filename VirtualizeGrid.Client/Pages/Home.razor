@@ -2,6 +2,7 @@
 @using Grpc.Net.Client
 @using VirtualizedGrid.Protos
 @inject GrpcChannel Channel
+@inject LocalDatabaseService DatabaseService
 
 <h3>Parts List</h3>
 <style>
@@ -43,7 +44,6 @@
         margin: 5px 0;
         font-size: 14px;
     }
-
 </style>
 
 <Virtualize Items="@parts" Context="part" ItemSize="50">
@@ -72,30 +72,47 @@
 
     protected override async Task OnInitializedAsync()
     {
-        var client = new PartService.PartServiceClient(Channel);
+        // Attempt to load data from SQLite cache first
+        parts = await DatabaseService.LoadCachedPartsDataAsync();
+        ItemsFetched = parts.Count;
+        DataSize = CalculateDataSize(parts);
+        StateHasChanged();
 
-        // Fetch the total count
+        // Check total items count in the server and update if necessary
+        var client = new PartService.PartServiceClient(Channel);
         var totalCountResponse = await client.GetPartsCountAsync(new Google.Protobuf.WellKnownTypes.Empty());
         TotalItems = totalCountResponse.TotalCount;
 
+        if (ItemsFetched < TotalItems)
+        {
+            // Fetch new data from server and update SQLite cache
+            await FetchAndCacheDataFromServer(client);
+        }
+    }
+
+    private async Task FetchAndCacheDataFromServer(PartService.PartServiceClient client)
+    {
         var request = new PartsRequest { ChunkSize = 20_000 };
         var stopwatch = System.Diagnostics.Stopwatch.StartNew();
 
         using var call = client.GetParts(request);
         try
         {
+            List<PartDto> newParts = new();
             while (await call.ResponseStream.MoveNext(CancellationToken.None))
             {
                 var batch = call.ResponseStream.Current;
                 foreach (var part in batch.Parts)
                 {
-                    parts.Add(new PartDto
+                    var partDto = new PartDto
                         {
                             Id = Guid.Parse(part.Id),
                             Name = part.Name,
                             CreationDate = DateTimeOffset.Parse(part.CreationDate),
                             Status = (PartStatus)part.Status
-                        });
+                        };
+                    parts.Add(partDto);
+                    newParts.Add(partDto);
                     ItemsFetched++;
                 }
 
@@ -103,10 +120,13 @@
                 DataSize = CalculateDataSize(parts);
                 StateHasChanged();
             }
+
+            // Cache new data in SQLite
+            await DatabaseService.CachePartsDataAsync(newParts);
         }
         catch (Exception ex)
         {
-            // Handle any exceptions
+            // Handle exceptions
         }
         finally
         {
