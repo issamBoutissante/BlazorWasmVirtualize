@@ -2,6 +2,7 @@
 using Microsoft.Data.Sqlite;
 using System.Data;
 using static VirtualizeGrid.Client.Pages.Home;
+using System.Diagnostics;
 
 namespace VirtualizeGrid.Client;
 
@@ -36,17 +37,26 @@ public class LocalDatabaseService
 
     public async Task CachePartsDataAsync(IEnumerable<PartDto> parts)
     {
-        var query = "INSERT OR REPLACE INTO Parts (Id, Name, CreationDate, Status) VALUES (@Id, @Name, @CreationDate, @Status)";
+        var clearTableQuery = "DELETE FROM Parts;";
+        var insertQuery = "INSERT INTO Parts (Id, Name, CreationDate, Status) VALUES (@Id, @Name, @CreationDate, @Status)";
 
         using var transaction = _connection.BeginTransaction();
         try
         {
-            await Connection.ExecuteAsync(query, parts, transaction: transaction);
+            // Clear existing records
+            await Connection.ExecuteAsync(clearTableQuery, transaction: transaction);
+
+            // Insert new records in bulk
+            int rowsAffected = await Connection.ExecuteAsync(insertQuery, parts, transaction: transaction);
             transaction.Commit();
+
+            // Debugging: Output number of rows inserted
+            Debug.WriteLine($"Rows inserted: {rowsAffected}");
         }
-        catch
+        catch (Exception ex)
         {
             transaction.Rollback();
+            Debug.WriteLine($"Error during insertion: {ex.Message}");
             throw;
         }
     }
@@ -54,7 +64,19 @@ public class LocalDatabaseService
     public async Task<List<PartDto>> LoadCachedPartsDataAsync()
     {
         var query = "SELECT * FROM Parts";
-        var queryResult = await Connection.QueryAsync<PartDto>(query);
-        return queryResult.ToList();
+        try
+        {
+            var queryResult = await Connection.QueryAsync<PartDto>(query);
+
+            // Debugging: Output number of rows fetched
+            Debug.WriteLine($"Rows fetched: {queryResult.Count()}");
+
+            return queryResult.ToList();
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"Error during reading: {ex.Message}");
+            throw;
+        }
     }
 }
