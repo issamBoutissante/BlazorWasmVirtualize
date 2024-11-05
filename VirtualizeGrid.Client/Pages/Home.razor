@@ -1,5 +1,6 @@
 ﻿@page "/"
 @using Grpc.Net.Client
+@using System.IO.Compression
 @using VirtualizedGrid.Protos
 @inject GrpcChannel Channel
 @inject LocalDatabaseService DatabaseService
@@ -68,7 +69,6 @@
 
 <h3>Parts List</h3>
 
-<!-- Search and Filter Controls -->
 <div>
     <input @bind="searchText" placeholder="Search parts..." style="width: 80%; padding: 5px; margin-bottom: 10px;" />
     <button @onclick="ApplyFiltersAndSorting">Search</button>
@@ -85,7 +85,6 @@
     </select>
 </div>
 
-<!-- Display Parts in Table Format -->
 <table>
     <thead>
         <tr>
@@ -161,8 +160,13 @@
         {
             while (await call.ResponseStream.MoveNext(CancellationToken.None))
             {
-                var batch = call.ResponseStream.Current;
-                foreach (var part in batch.Parts)
+                var compressedBatch = call.ResponseStream.Current;
+                var decompressedData = DecompressData(compressedBatch.Data.ToByteArray());
+
+                // Parse the decompressed data to retrieve the PartsBatch
+                var partsBatch = PartsBatch.Parser.ParseFrom(decompressedData);
+
+                foreach (var part in partsBatch.Parts)
                 {
                     var partDto = new PartDto
                         {
@@ -192,6 +196,17 @@
             stopwatch.Stop();
             TimeSpentFetching = stopwatch.Elapsed.TotalSeconds;
             StateHasChanged();
+        }
+    }
+
+    private byte[] DecompressData(byte[] data)
+    {
+        using (var input = new MemoryStream(data))
+        using (var output = new MemoryStream())
+        using (var gzip = new GZipStream(input, CompressionMode.Decompress))
+        {
+            gzip.CopyTo(output);
+            return output.ToArray();
         }
     }
 

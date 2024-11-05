@@ -5,7 +5,7 @@ import "google/protobuf/empty.proto"; // Import the Empty type
 package VirtualizedGrid.Protos;
 
 service PartService {
-    rpc GetParts (PartsRequest) returns (stream PartsBatch);
+    rpc GetParts (PartsRequest) returns (stream CompressedPartsBatch); // Use a defined message type here
     rpc GetPartsCount (google.protobuf.Empty) returns (PartsCountResponse);
 }
 
@@ -13,8 +13,14 @@ message PartsRequest {
     int32 chunk_size = 1;
 }
 
+// New message to represent compressed data
+message CompressedPartsBatch {
+    bytes data = 1; // Compressed data will be stored in this field
+}
+
+// Message to represent a batch of Part objects before compression
 message PartsBatch {
-    repeated Part parts = 1;
+    repeated Part parts = 1; // List of uncompressed Part objects
 }
 
 message Part {
