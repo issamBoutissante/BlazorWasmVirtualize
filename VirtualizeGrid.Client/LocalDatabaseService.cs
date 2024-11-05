@@ -19,6 +19,8 @@ public class LocalDatabaseService
     // Method to cache parts data in IndexedDB
     public async Task CachePartsDataAsync(IEnumerable<PartDto> parts)
     {
+
+        return;
         const int chunkSize = 10_000;
         var partList = parts.ToList();
 
