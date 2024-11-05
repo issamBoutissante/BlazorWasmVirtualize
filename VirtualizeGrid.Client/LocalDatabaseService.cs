@@ -1,68 +1,83 @@
-﻿using Blazored.LocalStorage;
-using System.Collections.Generic;
-using System.Diagnostics;
-using System.Threading.Tasks;
+﻿using Dapper;
+using Microsoft.Data.Sqlite;
+using System.Data;
 using static VirtualizeGrid.Client.Pages.Home;
+using System.Diagnostics;
 
 namespace VirtualizeGrid.Client;
 
 public class LocalDatabaseService
 {
-    private readonly ILocalStorageService _localStorage;
-    private const string PartsStorageKey = "CachedPartsData";
+    private const string DbName = "cachedData.db";
+    private readonly SqliteConnection _connection;
 
-    public LocalDatabaseService(ILocalStorageService localStorage)
+    public LocalDatabaseService()
     {
-        _localStorage = localStorage;
+        _connection = new SqliteConnection($"Filename={DbName}");
+        _connection.Open();
+
+        // Enable WAL mode for better write performance
+        using var walCmd = _connection.CreateCommand();
+        walCmd.CommandText = "PRAGMA journal_mode=WAL;";
+        walCmd.ExecuteNonQuery();
+
+        // Create table if it doesn't exist
+        using var cmd = _connection.CreateCommand();
+        cmd.CommandText = @"
+            CREATE TABLE IF NOT EXISTS Parts (
+                Id TEXT PRIMARY KEY,
+                Name TEXT NOT NULL,
+                CreationDate TEXT NOT NULL,
+                Status TEXT NOT NULL
+            );";
+        cmd.ExecuteNonQuery();
     }
 
-    // Method to cache parts data in IndexedDB
+    public IDbConnection Connection => _connection;
+
     public async Task CachePartsDataAsync(IEnumerable<PartDto> parts)
     {
-
         return;
-        const int chunkSize = 10_000;
-        var partList = parts.ToList();
+        var clearTableQuery = "DELETE FROM Parts;";
+        var insertQuery = "INSERT INTO Parts (Id, Name, CreationDate, Status) VALUES (@Id, @Name, @CreationDate, @Status)";
 
-        // Remove any previous chunks
-        int existingChunkCount = await _localStorage.GetItemAsync<int>("PartsChunksCount");
-        for (int i = 0; i < existingChunkCount; i++)
+        using var transaction = _connection.BeginTransaction();
+        try
         {
-            await _localStorage.RemoveItemAsync($"PartsStorageKey_{i}");
-        }
+            // Clear existing records
+            await Connection.ExecuteAsync(clearTableQuery, transaction: transaction);
 
-        // Save parts in chunks
-        for (int i = 0; i < partList.Count; i += chunkSize)
+            // Insert new records in bulk
+            int rowsAffected = await Connection.ExecuteAsync(insertQuery, parts, transaction: transaction);
+            transaction.Commit();
+
+            // Debugging: Output number of rows inserted
+            Debug.WriteLine($"Rows inserted: {rowsAffected}");
+        }
+        catch (Exception ex)
         {
-            var chunk = partList.Skip(i).Take(chunkSize).ToList();
-            await _localStorage.SetItemAsync($"PartsStorageKey_{i / chunkSize}", chunk);
+            transaction.Rollback();
+            Debug.WriteLine($"Error during insertion: {ex.Message}");
+            throw;
         }
-
-        // Save metadata about the number of chunks
-        await _localStorage.SetItemAsync("PartsChunksCount", (partList.Count + chunkSize - 1) / chunkSize);
     }
 
-
-    // Method to load cached parts data from IndexedDB
     public async Task<List<PartDto>> LoadCachedPartsDataAsync()
     {
-        var allParts = new List<PartDto>();
-
-        // Get the number of saved chunks
-        int chunkCount = await _localStorage.GetItemAsync<int>("PartsChunksCount");
-
-        // Load each chunk and combine them into the final list
-        for (int i = 0; i < chunkCount; i++)
+        var query = "SELECT * FROM Parts";
+        try
         {
-            var chunk = await _localStorage.GetItemAsync<List<PartDto>>($"PartsStorageKey_{i}");
-            if (chunk != null)
-            {
-                allParts.AddRange(chunk);
-            }
+            var queryResult = await Connection.QueryAsync<PartDto>(query);
+
+            // Debugging: Output number of rows fetched
+            Debug.WriteLine($"Rows fetched: {queryResult.Count()}");
+
+            return queryResult.ToList();
         }
-
-        Debug.WriteLine($"Rows fetched: {allParts.Count}");
-        return allParts;
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"Error during reading: {ex.Message}");
+            throw;
+        }
     }
-
 }

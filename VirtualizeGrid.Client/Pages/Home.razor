@@ -5,7 +5,7 @@
 @inject LocalDatabaseService DatabaseService
 
 <style>
-    /* CSS styles for the layout */
+    /* Styles for layout */
     .content-container {
         padding-bottom: 80px;
     }
@@ -130,7 +130,7 @@
     private bool IsSavingToCache = false;
     private string selectedStatusFilter = "";
     private string selectedSortColumn = "Name";
-    private bool isSortAscending = true; // Track sorting order
+    private bool isSortAscending = true;
     private string searchText = "";
 
     protected override async Task OnInitializedAsync()
@@ -152,7 +152,7 @@
 
     private async Task FetchAndCacheDataFromServer(PartService.PartServiceClient client)
     {
-        var request = new PartsRequest { ChunkSize = 20_000 };
+        var request = new PartsRequest { ChunkSize = 10_000 };
         var stopwatch = System.Diagnostics.Stopwatch.StartNew();
         List<PartDto> newParts = new();
 
@@ -211,12 +211,12 @@
     {
         if (selectedSortColumn == columnName)
         {
-            isSortAscending = !isSortAscending; // Toggle sort order if the same column is clicked again
+            isSortAscending = !isSortAscending;
         }
         else
         {
             selectedSortColumn = columnName;
-            isSortAscending = true; // Default to ascending when a new column is selected
+            isSortAscending = true;
         }
 
         ApplyFiltersAndSorting();
@@ -224,15 +224,12 @@
 
     private void ApplyFiltersAndSorting()
     {
-        // Apply search filter based on searchText
         var searchedParts = parts
             .Where(p => p.ToString().Contains(searchText, StringComparison.OrdinalIgnoreCase));
 
-        // Apply filtering based on selectedStatusFilter
         var filteredParts = searchedParts
             .Where(p => string.IsNullOrEmpty(selectedStatusFilter) || p.Status.ToString() == selectedStatusFilter);
 
-        // Apply sorting based on selectedSortColumn and order
         filteredAndSortedParts = selectedSortColumn switch
         {
             "Name" => isSortAscending ? filteredParts.OrderBy(p => p.Name).ToList() : filteredParts.OrderByDescending(p => p.Name).ToList(),

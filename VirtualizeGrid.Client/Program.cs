@@ -26,7 +26,6 @@ builder.Services.AddSingleton(services =>
 
     return grpcChannel;
 });
-builder.Services.AddBlazoredLocalStorage();
-builder.Services.AddScoped<LocalDatabaseService>();
+builder.Services.AddSingleton<LocalDatabaseService>();
 
 await builder.Build().RunAsync();
