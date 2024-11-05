@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Components.WebAssembly.Hosting;
 using VirtualizeGrid.Client;
 using Grpc.Net.Client;
 using Grpc.Net.Client.Web;
+using Blazored.LocalStorage;
 
 var builder = WebAssemblyHostBuilder.CreateDefault(args);
 builder.RootComponents.Add<App>("#app");
@@ -25,6 +26,7 @@ builder.Services.AddSingleton(services =>
 
     return grpcChannel;
 });
-builder.Services.AddSingleton<LocalDatabaseService>();
+builder.Services.AddBlazoredLocalStorage();
+builder.Services.AddScoped<LocalDatabaseService>();
 
 await builder.Build().RunAsync();

@@ -44,6 +44,11 @@
         margin: 5px 0;
         font-size: 14px;
     }
+
+    .saving-indicator {
+        color: #f39c12;
+    }
+
 </style>
 
 <Virtualize Items="@parts" Context="part" ItemSize="50">
@@ -59,6 +64,10 @@
     </div>
     <div class="footer-details">
         <p>Progress: @ProgressPercentage% | Items Fetched: @ItemsFetched | Data Size: @DataSize MB | Time: @TimeSpentFetching seconds</p>
+        @if (IsSavingToCache)
+        {
+            <p class="saving-indicator">Saving to cache...</p>
+        }
     </div>
 </div>
 
@@ -69,23 +78,22 @@
     private int TotalItems = 100_000; // Default or placeholder value
     private double DataSize = 0;
     private double TimeSpentFetching = 0;
+    private bool IsSavingToCache = false;
 
     protected override async Task OnInitializedAsync()
     {
-        // Attempt to load data from SQLite cache first
+        // Load data from cache first
         parts = await DatabaseService.LoadCachedPartsDataAsync();
         ItemsFetched = parts.Count;
         DataSize = CalculateDataSize(parts);
         StateHasChanged();
 
-        // Check total items count in the server and update if necessary
         var client = new PartService.PartServiceClient(Channel);
         var totalCountResponse = await client.GetPartsCountAsync(new Google.Protobuf.WellKnownTypes.Empty());
         TotalItems = totalCountResponse.TotalCount;
 
         if (ItemsFetched < TotalItems)
         {
-            // Fetch new data from server and update SQLite cache
             await FetchAndCacheDataFromServer(client);
         }
     }
@@ -96,9 +104,10 @@
         var stopwatch = System.Diagnostics.Stopwatch.StartNew();
 
         using var call = client.GetParts(request);
+        List<PartDto> newParts = new();
+
         try
         {
-            List<PartDto> newParts = new();
             while (await call.ResponseStream.MoveNext(CancellationToken.None))
             {
                 var batch = call.ResponseStream.Current;
@@ -121,8 +130,15 @@
                 StateHasChanged();
             }
 
-            // Cache new data in SQLite
+            // Indicate that caching is in progress
+            IsSavingToCache = true;
+            StateHasChanged();
+
+            // Cache data in IndexedDB
             await DatabaseService.CachePartsDataAsync(newParts);
+
+            // Indicate that caching has completed
+            IsSavingToCache = false;
         }
         catch (Exception ex)
         {

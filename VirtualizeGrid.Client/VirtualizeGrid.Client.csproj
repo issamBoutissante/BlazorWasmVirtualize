@@ -8,6 +8,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="Blazored.LocalStorage" Version="4.5.0" />
     <PackageReference Include="Dapper" Version="2.1.35" />
     <PackageReference Include="Google.Protobuf" Version="3.28.3" />
     <PackageReference Include="Grpc.Net.Client" Version="2.66.0" />

@@ -1,82 +1,66 @@
-﻿using Dapper;
-using Microsoft.Data.Sqlite;
-using System.Data;
-using static VirtualizeGrid.Client.Pages.Home;
+﻿using Blazored.LocalStorage;
+using System.Collections.Generic;
 using System.Diagnostics;
+using System.Threading.Tasks;
+using static VirtualizeGrid.Client.Pages.Home;
 
 namespace VirtualizeGrid.Client;
 
 public class LocalDatabaseService
 {
-    private const string DbName = "cachedData.db";
-    private readonly SqliteConnection _connection;
+    private readonly ILocalStorageService _localStorage;
+    private const string PartsStorageKey = "CachedPartsData";
 
-    public LocalDatabaseService()
+    public LocalDatabaseService(ILocalStorageService localStorage)
     {
-        _connection = new SqliteConnection($"Filename={DbName}");
-        _connection.Open();
-
-        // Enable WAL mode for better write performance
-        using var walCmd = _connection.CreateCommand();
-        walCmd.CommandText = "PRAGMA journal_mode=WAL;";
-        walCmd.ExecuteNonQuery();
-
-        // Create table if it doesn't exist
-        using var cmd = _connection.CreateCommand();
-        cmd.CommandText = @"
-            CREATE TABLE IF NOT EXISTS Parts (
-                Id TEXT PRIMARY KEY,
-                Name TEXT NOT NULL,
-                CreationDate TEXT NOT NULL,
-                Status TEXT NOT NULL
-            );";
-        cmd.ExecuteNonQuery();
+        _localStorage = localStorage;
     }
 
-    public IDbConnection Connection => _connection;
-
+    // Method to cache parts data in IndexedDB
     public async Task CachePartsDataAsync(IEnumerable<PartDto> parts)
     {
-        var clearTableQuery = "DELETE FROM Parts;";
-        var insertQuery = "INSERT INTO Parts (Id, Name, CreationDate, Status) VALUES (@Id, @Name, @CreationDate, @Status)";
+        const int chunkSize = 10_000;
+        var partList = parts.ToList();
 
-        using var transaction = _connection.BeginTransaction();
-        try
+        // Remove any previous chunks
+        int existingChunkCount = await _localStorage.GetItemAsync<int>("PartsChunksCount");
+        for (int i = 0; i < existingChunkCount; i++)
         {
-            // Clear existing records
-            await Connection.ExecuteAsync(clearTableQuery, transaction: transaction);
-
-            // Insert new records in bulk
-            int rowsAffected = await Connection.ExecuteAsync(insertQuery, parts, transaction: transaction);
-            transaction.Commit();
-
-            // Debugging: Output number of rows inserted
-            Debug.WriteLine($"Rows inserted: {rowsAffected}");
+            await _localStorage.RemoveItemAsync($"PartsStorageKey_{i}");
         }
-        catch (Exception ex)
+
+        // Save parts in chunks
+        for (int i = 0; i < partList.Count; i += chunkSize)
         {
-            transaction.Rollback();
-            Debug.WriteLine($"Error during insertion: {ex.Message}");
-            throw;
+            var chunk = partList.Skip(i).Take(chunkSize).ToList();
+            await _localStorage.SetItemAsync($"PartsStorageKey_{i / chunkSize}", chunk);
         }
+
+        // Save metadata about the number of chunks
+        await _localStorage.SetItemAsync("PartsChunksCount", (partList.Count + chunkSize - 1) / chunkSize);
     }
 
+
+    // Method to load cached parts data from IndexedDB
     public async Task<List<PartDto>> LoadCachedPartsDataAsync()
     {
-        var query = "SELECT * FROM Parts";
-        try
-        {
-            var queryResult = await Connection.QueryAsync<PartDto>(query);
+        var allParts = new List<PartDto>();
 
-            // Debugging: Output number of rows fetched
-            Debug.WriteLine($"Rows fetched: {queryResult.Count()}");
+        // Get the number of saved chunks
+        int chunkCount = await _localStorage.GetItemAsync<int>("PartsChunksCount");
 
-            return queryResult.ToList();
-        }
-        catch (Exception ex)
+        // Load each chunk and combine them into the final list
+        for (int i = 0; i < chunkCount; i++)
         {
-            Debug.WriteLine($"Error during reading: {ex.Message}");
-            throw;
+            var chunk = await _localStorage.GetItemAsync<List<PartDto>>($"PartsStorageKey_{i}");
+            if (chunk != null)
+            {
+                allParts.AddRange(chunk);
+            }
         }
+
+        Debug.WriteLine($"Rows fetched: {allParts.Count}");
+        return allParts;
     }
+
 }
