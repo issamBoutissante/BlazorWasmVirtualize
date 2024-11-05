@@ -7,7 +7,7 @@
 <h3>Parts List</h3>
 <style>
     .content-container {
-        padding-bottom: 80px; /* Space for the footer */
+        padding-bottom: 80px;
     }
 
     .fixed-footer {
@@ -49,14 +49,62 @@
         color: #f39c12;
     }
 
+    table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 15px;
+    }
+
+    th, td {
+        padding: 10px;
+        border: 1px solid #ddd;
+        text-align: left;
+    }
+
+    th {
+        cursor: pointer;
+    }
+
 </style>
 
-<Virtualize Items="@parts" Context="part" ItemSize="50">
-    <div style="padding: 5px; border-bottom: 1px solid #ccc;">
-        <strong>@part.Name</strong> - @part.Status <br />
-        Created on: @part.CreationDate.ToString("yyyy-MM-dd")
-    </div>
-</Virtualize>
+<!-- Filter and Sort Controls -->
+<div>
+    <label>Filter by Status:</label>
+    <select @onchange="FilterByStatus">
+        <option value="">All</option>
+        <option value="Available">Available</option>
+        <option value="OutOfStock">Out of Stock</option>
+        <option value="Discontinued">Discontinued</option>
+        <option value="BackOrder">Back Order</option>
+    </select>
+
+    <label>Sort by:</label>
+    <select @onchange="SortByColumn">
+        <option value="Name">Name</option>
+        <option value="CreationDate">Creation Date</option>
+        <option value="Status">Status</option>
+    </select>
+</div>
+
+<!-- Display Parts in Table Format -->
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Creation Date</th>
+            <th>Status</th>
+        </tr>
+    </thead>
+    <tbody>
+        <Virtualize Items="@filteredAndSortedParts" Context="part" ItemSize="50">
+            <tr>
+                <td>@part.Name</td>
+                <td>@part.CreationDate.ToString("yyyy-MM-dd")</td>
+                <td>@part.Status</td>
+            </tr>
+        </Virtualize>
+    </tbody>
+</table>
 
 <div class="fixed-footer">
     <div class="progress-bar">
@@ -73,19 +121,20 @@
 
 @code {
     private List<PartDto> parts = new();
+    private List<PartDto> filteredAndSortedParts = new();
     private int ProgressPercentage = 0;
     private int ItemsFetched = 0;
     private int TotalItems = 100_000; // Default or placeholder value
     private double DataSize = 0;
     private double TimeSpentFetching = 0;
     private bool IsSavingToCache = false;
+    private string selectedStatusFilter = "";
+    private string selectedSortColumn = "Name";
 
     protected override async Task OnInitializedAsync()
     {
-        // Load data from cache first
         parts = await DatabaseService.LoadCachedPartsDataAsync();
-        ItemsFetched = parts.Count;
-        DataSize = CalculateDataSize(parts);
+        ApplyFiltersAndSorting();
         StateHasChanged();
 
         var client = new PartService.PartServiceClient(Channel);
@@ -102,10 +151,9 @@
     {
         var request = new PartsRequest { ChunkSize = 20_000 };
         var stopwatch = System.Diagnostics.Stopwatch.StartNew();
-
-        using var call = client.GetParts(request);
         List<PartDto> newParts = new();
 
+        using var call = client.GetParts(request);
         try
         {
             while (await call.ResponseStream.MoveNext(CancellationToken.None))
@@ -127,17 +175,13 @@
 
                 ProgressPercentage = (ItemsFetched * 100) / TotalItems;
                 DataSize = CalculateDataSize(parts);
+                ApplyFiltersAndSorting();
                 StateHasChanged();
             }
 
-            // Indicate that caching is in progress
             IsSavingToCache = true;
             StateHasChanged();
-
-            // Cache data in IndexedDB
             await DatabaseService.CachePartsDataAsync(newParts);
-
-            // Indicate that caching has completed
             IsSavingToCache = false;
         }
         catch (Exception ex)
@@ -148,7 +192,7 @@
         {
             stopwatch.Stop();
             TimeSpentFetching = stopwatch.Elapsed.TotalSeconds;
-            StateHasChanged(); // Final UI update after fetching completes
+            StateHasChanged();
         }
     }
 
@@ -157,6 +201,35 @@
         int sizePerItem = 16 + (36 + 8 + 4);
         return (data.Count * sizePerItem) / (1024.0 * 1024.0);
     }
+
+    private void FilterByStatus(ChangeEventArgs e)
+    {
+        selectedStatusFilter = e.Value?.ToString();
+        ApplyFiltersAndSorting();
+    }
+
+    private void SortByColumn(ChangeEventArgs e)
+    {
+        selectedSortColumn = e.Value?.ToString();
+        ApplyFiltersAndSorting();
+    }
+
+    private void ApplyFiltersAndSorting()
+    {
+        // Apply filtering based on selectedStatusFilter
+        var filteredParts = parts
+            .Where(p => string.IsNullOrEmpty(selectedStatusFilter) || p.Status.ToString() == selectedStatusFilter);
+
+        // Apply sorting based on selectedSortColumn
+        filteredAndSortedParts = selectedSortColumn switch
+        {
+            "Name" => filteredParts.OrderBy(p => p.Name).ToList(),
+            "CreationDate" => filteredParts.OrderBy(p => p.CreationDate).ToList(),
+            "Status" => filteredParts.OrderBy(p => p.Status).ToList(),
+            _ => filteredParts.ToList()
+        };
+    }
+
 
     public class PartDto
     {
