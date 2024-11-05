@@ -107,6 +107,7 @@
 </table>
 
 <div class="fixed-footer">
+    <p>Showing @filteredAndSortedParts.Count records</p>
     <div class="progress-bar">
         <div class="progress" style="width: @ProgressPercentage%;">@ProgressPercentage% loaded</div>
     </div>
@@ -124,7 +125,7 @@
     private List<PartDto> filteredAndSortedParts = new();
     private int ProgressPercentage = 0;
     private int ItemsFetched = 0;
-    private int TotalItems = 100_000; // Default or placeholder value
+    private int TotalItems = 100_000;
     private double DataSize = 0;
     private double TimeSpentFetching = 0;
     private bool IsSavingToCache = false;
@@ -134,6 +135,7 @@
     protected override async Task OnInitializedAsync()
     {
         parts = await DatabaseService.LoadCachedPartsDataAsync();
+        ItemsFetched = parts.Count;
         ApplyFiltersAndSorting();
         StateHasChanged();
 
@@ -184,10 +186,6 @@
             await DatabaseService.CachePartsDataAsync(newParts);
             IsSavingToCache = false;
         }
-        catch (Exception ex)
-        {
-            // Handle exceptions
-        }
         finally
         {
             stopwatch.Stop();
@@ -216,11 +214,9 @@
 
     private void ApplyFiltersAndSorting()
     {
-        // Apply filtering based on selectedStatusFilter
         var filteredParts = parts
             .Where(p => string.IsNullOrEmpty(selectedStatusFilter) || p.Status.ToString() == selectedStatusFilter);
 
-        // Apply sorting based on selectedSortColumn
         filteredAndSortedParts = selectedSortColumn switch
         {
             "Name" => filteredParts.OrderBy(p => p.Name).ToList(),
@@ -229,7 +225,6 @@
             _ => filteredParts.ToList()
         };
     }
-
 
     public class PartDto
     {
