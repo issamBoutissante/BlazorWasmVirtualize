@@ -4,8 +4,8 @@
 @inject GrpcChannel Channel
 @inject LocalDatabaseService DatabaseService
 
-<h3>Parts List</h3>
 <style>
+    /* CSS styles for the layout */
     .content-container {
         padding-bottom: 80px;
     }
@@ -64,10 +64,16 @@
     th {
         cursor: pointer;
     }
-
 </style>
 
-<!-- Filter and Sort Controls -->
+<h3>Parts List</h3>
+
+<!-- Search and Filter Controls -->
+<div>
+    <input @bind="searchText" placeholder="Search parts..." style="width: 80%; padding: 5px; margin-bottom: 10px;" />
+    <button @onclick="ApplyFiltersAndSorting">Search</button>
+</div>
+
 <div>
     <label>Filter by Status:</label>
     <select @onchange="FilterByStatus">
@@ -77,22 +83,15 @@
         <option value="Discontinued">Discontinued</option>
         <option value="BackOrder">Back Order</option>
     </select>
-
-    <label>Sort by:</label>
-    <select @onchange="SortByColumn">
-        <option value="Name">Name</option>
-        <option value="CreationDate">Creation Date</option>
-        <option value="Status">Status</option>
-    </select>
 </div>
 
 <!-- Display Parts in Table Format -->
 <table>
     <thead>
         <tr>
-            <th>Name</th>
-            <th>Creation Date</th>
-            <th>Status</th>
+            <th @onclick="@(() => SortByColumn("Name"))">Name</th>
+            <th @onclick="@(() => SortByColumn("CreationDate"))">Creation Date</th>
+            <th @onclick="@(() => SortByColumn("Status"))">Status</th>
         </tr>
     </thead>
     <tbody>
@@ -131,6 +130,8 @@
     private bool IsSavingToCache = false;
     private string selectedStatusFilter = "";
     private string selectedSortColumn = "Name";
+    private bool isSortAscending = true; // Track sorting order
+    private string searchText = "";
 
     protected override async Task OnInitializedAsync()
     {
@@ -206,22 +207,37 @@
         ApplyFiltersAndSorting();
     }
 
-    private void SortByColumn(ChangeEventArgs e)
+    private void SortByColumn(string columnName)
     {
-        selectedSortColumn = e.Value?.ToString();
+        if (selectedSortColumn == columnName)
+        {
+            isSortAscending = !isSortAscending; // Toggle sort order if the same column is clicked again
+        }
+        else
+        {
+            selectedSortColumn = columnName;
+            isSortAscending = true; // Default to ascending when a new column is selected
+        }
+
         ApplyFiltersAndSorting();
     }
 
     private void ApplyFiltersAndSorting()
     {
-        var filteredParts = parts
+        // Apply search filter based on searchText
+        var searchedParts = parts
+            .Where(p => p.ToString().Contains(searchText, StringComparison.OrdinalIgnoreCase));
+
+        // Apply filtering based on selectedStatusFilter
+        var filteredParts = searchedParts
             .Where(p => string.IsNullOrEmpty(selectedStatusFilter) || p.Status.ToString() == selectedStatusFilter);
 
+        // Apply sorting based on selectedSortColumn and order
         filteredAndSortedParts = selectedSortColumn switch
         {
-            "Name" => filteredParts.OrderBy(p => p.Name).ToList(),
-            "CreationDate" => filteredParts.OrderBy(p => p.CreationDate).ToList(),
-            "Status" => filteredParts.OrderBy(p => p.Status).ToList(),
+            "Name" => isSortAscending ? filteredParts.OrderBy(p => p.Name).ToList() : filteredParts.OrderByDescending(p => p.Name).ToList(),
+            "CreationDate" => isSortAscending ? filteredParts.OrderBy(p => p.CreationDate).ToList() : filteredParts.OrderByDescending(p => p.CreationDate).ToList(),
+            "Status" => isSortAscending ? filteredParts.OrderBy(p => p.Status).ToList() : filteredParts.OrderByDescending(p => p.Status).ToList(),
             _ => filteredParts.ToList()
         };
     }
@@ -232,13 +248,10 @@
         public string Name { get; set; } = string.Empty;
         public DateTimeOffset CreationDate { get; set; }
         public PartStatus Status { get; set; }
-    }
 
-    public enum PartStatus
-    {
-        Available,
-        OutOfStock,
-        Discontinued,
-        BackOrder
+        public override string ToString()
+        {
+            return $"{Name} {CreationDate:yyyy-MM-dd} {Status}";
+        }
     }
 }
